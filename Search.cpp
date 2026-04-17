@@ -4,35 +4,51 @@
 #include <unordered_map>
 #include <iostream>
 #include <limits>
-
+#include <deque>
+#include <cmath>
 
 namespace std
 {
-    //this is needed to store a pair<int,int> in an associative container
-    //such as unorered_set and unordered_map
-	template<> struct hash<std::pair<int,int>>
-	{
-		std::size_t operator()( const std::pair<int,int> & p) const noexcept
-		{
+    template<> struct hash<std::pair<int,int>>
+    {
+        std::size_t operator()( const std::pair<int,int> & p) const noexcept
+        {
             hash<int> hasher;
-			return hasher(p.first) ^ (hasher(p.second)<<1);
-
-		}
-	};
+            return hasher(p.first) ^ (hasher(p.second)<<1);
+        }
+    };
 }
 
-std::vector<std::pair<int,int>> Search::reconstruct(const std::unordered_map<std::pair<int,int>,std::pair<int,int>> &pathCache, const std::pair<int,int> &start){
-	std::deque<std::pair<int,int>> nodes;
-	auto node = start;//make copy
+struct Compare
+{
+    bool operator()(const std::pair<std::pair<int,int>, float>& a,
+                    const std::pair<std::pair<int,int>, float>& b)
+    {
+        return a.second > b.second;
+    }
+};
 
-    //traverse path from goal to start
+float Search::Heuristic(std::pair<int,int> a, std::pair<int,int> b)
+{
+    return abs(a.first - b.first) + abs(a.second - b.second);
+}
 
-    //
-	//while(true){
-        //implement
-	//}
+std::vector<std::pair<int,int>> Search::reconstruct(
+    const std::unordered_map<std::pair<int,int>,std::pair<int,int>> &pathCache,
+    const std::pair<int,int> &start)
+{
+    std::deque<std::pair<int,int>> nodes;
+    auto node = start;
 
-    //revert path and return it
+    while(true){
+        nodes.push_front(node);
+
+        if(pathCache.find(node) == pathCache.end())
+            break;
+
+        node = pathCache.at(node);
+    }
+
     std::vector<std::pair<int,int>> vec;
     for(auto p:nodes){
         vec.push_back(p);
@@ -40,52 +56,138 @@ std::vector<std::pair<int,int>> Search::reconstruct(const std::unordered_map<std
     return vec;
 }
 
-std::vector<std::pair<int,int>> Search::BFS(const Map& map, std::pair<int,int> start, std::pair<int,int> goal){
+std::vector<std::pair<int,int>> Search::BFS(
+    const Map& map,
+    std::pair<int,int> start,
+    std::pair<int,int> goal)
+{
     std::cout<<"===========================\nRunning BFS...\n";
-	auto startTime = std::chrono::high_resolution_clock::now();
+    auto startTime = std::chrono::high_resolution_clock::now();
 
-    //stores possible directions
     std::pair<int,int> dirs[]{{-1,0},{0,1},{1,0},{0,-1}};
 
-    bool visited[map.h][map.w]{false};      //we'll just use a matrix og booleans to indicated if visited
+    bool visited[map.h][map.w]{false};
     std::queue<std::pair<int,int>> OPEN;
-    std::unordered_map<std::pair<int,int>,std::pair<int,int>> pathCache;    ////hashmap to reconstruct path: child -> parent
+    std::unordered_map<std::pair<int,int>,std::pair<int,int>> pathCache;
 
-    //add firts node to open list
+    OPEN.push(start);
+    visited[start.first][start.second] = true;
 
     while(!OPEN.empty()){
-        //get node
+        auto pos = OPEN.front();
+        OPEN.pop();
 
-        //check if node is goal
-		/*if(pos==goal){
-			auto endTime = std::chrono::high_resolution_clock::now();
-			int count=0;
+        if(pos == goal){
+            auto endTime = std::chrono::high_resolution_clock::now();
+
+            int count=0;
             for(int i=0;i<map.h;i++){
                 for(int j=0;j<map.w;j++){
-                    if(visited[i][j])count++;
+                    if(visited[i][j]) count++;
                 }
             }
+
             std::cout<<"VISITED: "<<count<<std::endl;
-			std::cout<<"OPEN: "<<OPEN.size()<<std::endl;
-			std::cout<<"FOUND in "<<(endTime-startTime).count()/1000000.0<<"ms\n";
-			return reconstruct(pathCache,pos);
-		}*/
+            std::cout<<"OPEN: "<<OPEN.size()<<std::endl;
+            std::cout<<"FOUND in "<<(endTime-startTime).count()/1000000.0<<"ms\n";
 
-		for(auto dir:dirs){
-			//copy the position
+            return reconstruct(pathCache,pos);
+        }
 
-            //then move it
-            
-            //if illegal or visited, skip it
-            
-            //add child to open list
+        for(auto dir:dirs){
+            std::pair<int,int> newPos = pos;
 
-            //register path
-		}
-	}
-	std::cout<<"NOT FOUND!!!!\n";
-    
-    //let's just return start and goal to draw them
+            newPos.first += dir.first;
+            newPos.second += dir.second;
+
+            if(newPos.first < 0 || newPos.first >= map.h ||
+               newPos.second < 0 || newPos.second >= map.w)
+                continue;
+
+            if(map._map[newPos.first][newPos.second] == 1)
+                continue;
+
+            if(visited[newPos.first][newPos.second])
+                continue;
+
+            visited[newPos.first][newPos.second] = true;
+            OPEN.push(newPos);
+
+            pathCache[newPos] = pos;
+        }
+    }
+
+    std::cout<<"NOT FOUND!!!!\n";
+
+    std::vector<std::pair<int,int>> path;
+    path.push_back(start);
+    path.push_back(goal);
+    return path;
+}
+
+std::vector<std::pair<int,int>> Search::greedyBFS(
+    const Map& map,
+    std::pair<int,int> start,
+    std::pair<int,int> goal)
+{
+    std::cout<<"===========================\nRunning Greedy BFS...\n";
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    std::pair<int,int> dirs[]{{-1,0},{0,1},{1,0},{0,-1}};
+
+    std::vector<std::vector<bool>> visited(map.h, std::vector<bool>(map.w,false));
+
+    std::priority_queue<
+        std::pair<std::pair<int,int>, float>,
+        std::vector<std::pair<std::pair<int,int>, float>>,
+        Compare
+    > OPEN;
+
+    std::unordered_map<std::pair<int,int>,std::pair<int,int>> pathCache;
+
+    OPEN.push({start, Heuristic(start, goal)});
+
+    while(!OPEN.empty()){
+        auto current = OPEN.top().first;
+        OPEN.pop();
+
+        if(visited[current.first][current.second])
+            continue;
+
+        visited[current.first][current.second] = true;
+
+        if(current == goal){
+            auto endTime = std::chrono::high_resolution_clock::now();
+            std::cout<<"FOUND in "<<(endTime-startTime).count()/1000000.0<<"ms\n";
+            return reconstruct(pathCache,current);
+        }
+
+        for(auto dir:dirs){
+            std::pair<int,int> newPos = current;
+
+            newPos.first += dir.first;
+            newPos.second += dir.second;
+
+            if(newPos.first < 0 || newPos.first >= map.h ||
+               newPos.second < 0 || newPos.second >= map.w)
+                continue;
+
+            if(map._map[newPos.first][newPos.second] == 1)
+                continue;
+
+            if(visited[newPos.first][newPos.second])
+                continue;
+
+            pathCache[newPos] = current;
+
+            float h = Heuristic(newPos, goal);
+            OPEN.push({newPos, h});
+        }
+    }
+
+    std::cout<<"NOT FOUND!!!!\n";
+
     std::vector<std::pair<int,int>> path;
     path.push_back(start);
     path.push_back(goal);
