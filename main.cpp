@@ -57,7 +57,7 @@ int main(int argc, char *argv[]){
 
     colorMap.print();
 
-    auto path = Search::greedyBFS(map, {x1,y1}, {x2,y2});
+    auto path = Search::AStar(map, {x1,y1}, {x2,y2});
     colorMap.print(path);
 
     if(path.size() <= 2 && path[0] != path[1]){
